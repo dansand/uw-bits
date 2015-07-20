@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<StGermainData xmlns="http://www.vpac.org/StGermain/XML_IO_Handler/Jun2003">
+  <list name="plugins"/>
+  <list name="import"/>
+  <struct name="parameters"/>
+  <struct name="info"/>
+  <struct name="components"/>
+  <param name="outputPath">./</param>
+  <param name="outputSlimmedXML">true</param>
+</StGermainData>
