@@ -5,7 +5,6 @@
 
 # Stagnant lid convection model
 
-get_ipython().magic(u'matplotlib inline')
 
 import underworld as uw
 import math
@@ -21,13 +20,13 @@ dim = 2
 # In[3]:
 
 # create mesh objects
-elementMesh = uw.mesh.FeMesh_Cartesian( elementType='Q2/dPc1', 
-                                         elementRes=(32,32), 
-                                           minCoord=(0.,0.), 
+elementMesh = uw.mesh.FeMesh_Cartesian( elementType='Q2/dPc1',
+                                         elementRes=(32,32),
+                                           minCoord=(0.,0.),
                                            maxCoord=(1.,1.)  )
 
 linearMesh   = elementMesh
-constantMesh = elementMesh.subMesh 
+constantMesh = elementMesh.subMesh
 
 
 # In[4]:
@@ -59,13 +58,6 @@ for index, coord in enumerate(linearMesh.data):
     tempData[index] = min(1,max(0,toptemp + scaleFactor*(1. - coord[1]) + perturbation_scale * pertCoeff ));
 
 
-# In[6]:
-
-figtemp = plt.Figure()
-tempminmax = fn.view.min_max(temperatureField)
-figtemp.Surface(tempminmax, elementMesh)
-figtemp.show()
-
 
 # In[7]:
 
@@ -76,15 +68,15 @@ linearMesh.specialSets.keys()
 
 # In[8]:
 
-# Get the actual sets 
+# Get the actual sets
 #
 #  HJJJJJJH
 #  I      I
 #  I      I
 #  I      I
 #  HJJJJJJH
-#  
-#  Note that H = I & J 
+#
+#  Note that H = I & J
 
 # Note that we use operator overloading to combine sets
 IWalls = linearMesh.specialSets["MinI_VertexSet"] + linearMesh.specialSets["MaxI_VertexSet"]
@@ -94,14 +86,14 @@ JWalls = linearMesh.specialSets["MinJ_VertexSet"] + linearMesh.specialSets["MaxJ
 # In[9]:
 
 # Now setup the dirichlet boundary condition
-# Note that through this object, we are flagging to the system 
-# that these nodes are to be considered as boundary conditions. 
+# Note that through this object, we are flagging to the system
+# that these nodes are to be considered as boundary conditions.
 # Also note that we provide a tuple of sets.. One for the Vx, one for Vy.
-freeslipBC = uw.conditions.DirichletCondition(     variable=velocityField, 
+freeslipBC = uw.conditions.DirichletCondition(     variable=velocityField,
                                               nodeIndexSets=(IWalls,JWalls) )
 
 # also set dirichlet for temp field
-tempBC = uw.conditions.DirichletCondition(     variable=temperatureField, 
+tempBC = uw.conditions.DirichletCondition(     variable=temperatureField,
                                               nodeIndexSets=(JWalls,) )
 
 
@@ -122,22 +114,16 @@ for index in linearMesh.specialSets["MaxJ_VertexSet"]:
 eta0 = 1.0e-6
 activationEnergy = 27.63102112
 Ra = 1.e6
-viscosityFn = eta0 *  fn.math.exp( activationEnergy / (temperatureField+1.) ) 
+viscosityFn = eta0 *  fn.math.exp( activationEnergy / (temperatureField+1.) )
 
 densityFn = Ra*temperatureField
 # Define our gravity using a python tuple (this will be automatically converted to a function)
 gravity = ( 0.0, 1.0 )
-# now create a buoyancy force vector.. the gravity tuple is converted to a function 
+# now create a buoyancy force vector.. the gravity tuple is converted to a function
 # here via operator overloading
 buoyancyFn = gravity*densityFn
 
 
-# In[12]:
-
-# lets take a look at the eta function
-figEta = plt.Figure()
-figEta.Surface(viscosityFn, linearMesh)
-figEta.show()
 
 
 # In[13]:
@@ -145,10 +131,10 @@ figEta.show()
 # Setup a stokes system
 # For PIC style integration, we include a swarm for the a PIC integration swarm is generated within.
 # For gauss integration, simple do not include the swarm. Nearest neighbour is used where required.
-stokesPIC = uw.systems.Stokes(velocityField=velocityField, 
+stokesPIC = uw.systems.Stokes(velocityField=velocityField,
                               pressureField=pressureField,
                               conditions=[freeslipBC,],
-                              viscosityFn=fn.exception.SafeMaths(viscosityFn), 
+                              viscosityFn=fn.exception.SafeMaths(viscosityFn),
                               bodyForceFn=buoyancyFn )
 
 solver=uw.systems.Solver(stokesPIC)
@@ -181,14 +167,14 @@ print solver.options.A11.list()
 # Create advdiff system
 advDiff = uw.systems.AdvectionDiffusion( temperatureField, velocityField, diffusivity=1., conditions=[tempBC,] )
 # Also create some integral objects which are used to calculate statistics.
-v2sum_integral  = uw.utils.Integral( feMesh=linearMesh, fn=fn.math.dot(velocityField, velocityField) ) 
+v2sum_integral  = uw.utils.Integral( feMesh=linearMesh, fn=fn.math.dot(velocityField, velocityField) )
 volume_integral = uw.utils.Integral( feMesh=linearMesh, fn=1. )
 
 
 # In[15]:
 
-surface_Tgradient = uw.utils.Integral(temperatureField.gradientFn[1], linearMesh, integrationType="surface", surfaceIndexSet=linearMesh.specialSets["MaxJ_VertexSet"])
-basalT            = uw.utils.Integral(temperatureField              , linearMesh, integrationType="surface", surfaceIndexSet=linearMesh.specialSets["MinJ_VertexSet"])
+#surface_Tgradient = uw.utils.Integral(temperatureField.gradientFn[1], linearMesh, integrationType="surface", surfaceIndexSet=linearMesh.specialSets["MaxJ_VertexSet"])
+#basalT            = uw.utils.Integral(temperatureField              , linearMesh, integrationType="surface", surfaceIndexSet=linearMesh.specialSets["MinJ_VertexSet"])
 
 
 # In[16]:
@@ -196,9 +182,6 @@ basalT            = uw.utils.Integral(temperatureField              , linearMesh
 # Stepping. Initialise time and timestep.
 realtime = 0.
 step = 0
-figtemp = plt.Figure()
-figtemp.Surface(temperatureField, linearMesh)
-time_vals = []
 vrms_vals = []
 Nu_vals = []
 
@@ -211,28 +194,28 @@ start = time.clock()
 # Perform 1000 steps
 
 volume = volume_integral.integrate()
-while step<2:
+while step<10:
     # Get solution for initial configuration
     stokesPIC.solve()
     # Retrieve the maximum possible timestep for the AD system.
     dt = advDiff.get_max_dt()
     if step == 0:
         dt = 0.
-    # Advect using this timestep siz    
+    # Advect using this timestep siz
     advDiff.integrate(dt)
-    
+
     # Calculate the RMS velocity
-    v2sum = v2sum_integral.integrate()
-    rms_v = math.sqrt(v2sum[0]/volume[0])
+    #v2sum = v2sum_integral.integrate()
+    #rms_v = math.sqrt(v2sum[0]/volume[0])
     #nu_no = -surface_Tgradient.integrate()[0] / basalT.integrate()[0]
-    
+
     # Increment time and store results
     realtime += dt
     step += 1
-    vrms_vals.append( rms_v )
-    time_vals.append( realtime )
+    #vrms_vals.append( rms_v )
+    #time_vals.append( realtime )
     #Nu_vals.append(nu_no)
-                   
+
     if step ==0 or step % 25 == 0:
         print "step = {:04d}; time = {:.6f}, vrms = {:6.2f}, nusselt = {:6.4f}, CPU = {:4.1f}s".format(
                step, realtime, rms_v, time.clock()-start)
@@ -240,33 +223,4 @@ while step<2:
 
 # In[20]:
 
-print "average per timestep = ", (time.clock() - start)/float(step), " over ", step, " steps"
-
-
-# In[21]:
-
-figVT = plt.Figure()
-figVT.Surface(temperatureField, linearMesh)
-figVT.VectorArrows(velocityField, linearMesh, lengthScale=0.00075, arrowHeadSize=0.2 )
-figVT.show()
-
-
-# In[23]:
-
-import matplotlib.pyplot as pyplot
-#import numpy as np
-
-surface_points_X = linearMesh.data[linearMesh.specialSets["MinJ_VertexSet"].data].T[0]
-
-figure, (plot1, plot2) = pyplot.subplots(1,2)
-figure.set_size_inches(10,6)
-plot1.plot(time_vals, vrms_vals, linewidth=2.5)
-#plot2.plot(time_vals, Nu_vals, linewidth=2.5)
-
-figure.show()
-
-
-# In[ ]:
-
-
-
+#print "average per timestep = ", (time.clock() - start)/float(step), " over ", step, " steps"
