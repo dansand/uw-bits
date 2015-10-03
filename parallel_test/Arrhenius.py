@@ -21,7 +21,7 @@ dim = 2
 
 # create mesh objects
 elementMesh = uw.mesh.FeMesh_Cartesian( elementType='Q2/dPc1',
-                                         elementRes=(32,32),
+                                         elementRes=(192,192),
                                            minCoord=(0.,0.),
                                            maxCoord=(1.,1.)  )
 
@@ -194,7 +194,7 @@ start = time.clock()
 # Perform 1000 steps
 
 volume = volume_integral.integrate()
-while step<10:
+while step<100:
     # Get solution for initial configuration
     stokesPIC.solve()
     # Retrieve the maximum possible timestep for the AD system.
