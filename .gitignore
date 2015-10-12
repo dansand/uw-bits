@@ -1,2 +1,4 @@
-tosi/images/*
-tosi/parallel_version/TosiOutput/*
+tosi/old_version/images/*
+tosi/parallel_version/TosiOutput/images/*
+tosi/parallel_version/TosiOutput/gldbs/*
+tosi/parallel_version/TosiOutput/files/*
