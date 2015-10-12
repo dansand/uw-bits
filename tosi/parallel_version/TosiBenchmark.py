@@ -442,7 +442,7 @@ step = 0
 timevals = [0.]
 vrmsvals = []
 steps_end = 1000
-steps_output = 50
+steps_output = 200
 steps_outtoscreen = 50
 steps_outtoscreen = max(steps_outtoscreen,1)
 steps_output = min(steps_output,steps_end/10)
@@ -456,7 +456,7 @@ start = time.clock()
 # setup summary output file (name above)
 f_o = open(outputPath+outputFile, 'w')
 # Perform steps
-while step < steps_end:
+while realtime < 3:
     #Enter non-linear loop
     solver.solve(nonLinearIterate=True)
     dt = advDiff.get_max_dt()
