@@ -247,10 +247,10 @@ vrmsvals = []
 
 
 
-# In[22]:
+# In[1]:
 
 sectoka = (3600*24*365*1000.)
-sectoka
+sectoma = (3600*24*365*1e6)
 
 
 # In[23]:
@@ -260,7 +260,7 @@ f_o = open(outputPath+outputFile, 'w')
 fname = "topo.hdf5"
 fullpath = os.path.join( tempPath+ fname)
 start = time.clock()
-while step<10:
+while realtime /sectoma < 22.:
     #stokesPIC2.solve(nonLinearIterate=True)
     solver.solve()
     dt1 = advector1.get_max_dt()
@@ -283,7 +283,7 @@ while step<10:
         f_o.write((2*'%-15s ' + '\n') % (realtime,maxt))
         tempfile.close()
         os.remove(fullpath)
-    print 'step =',step, 'time', realtime/sectoka
+    print 'step =',step
 
 
 # In[ ]:
