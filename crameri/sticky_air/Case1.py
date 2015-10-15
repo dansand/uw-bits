@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[3]:
+# In[1]:
 
 # RT PIC - classic and nearest neighbour
 import underworld as uw
@@ -14,16 +14,16 @@ import time
 import h5py
 
 
-# In[4]:
+# In[2]:
 
-CASE = 1.
+CASE = 1
 
 outputPath = 'CrameriOutput/'
 tempPath = 'temp/'
 outputFile = 'results_case' + str(CASE) + '.dat'
 
 
-# In[5]:
+# In[3]:
 
 # make directories if they don't exist
 if not os.path.isdir(outputPath):
@@ -32,12 +32,12 @@ if not os.path.isdir(tempPath):
     os.makedirs(tempPath)    
 
 
-# In[6]:
+# In[4]:
 
 dim = 2
 
 
-# In[7]:
+# In[5]:
 
 elementMesh = uw.mesh.FeMesh_Cartesian( elementType=("Q1/dQ0"),  
                                          elementRes=(384,192), 
@@ -47,7 +47,7 @@ linearMesh   = elementMesh
 constantMesh = elementMesh.subMesh
 
 
-# In[8]:
+# In[6]:
 
 # create fevariables
 velocityField    = uw.fevariable.FeVariable( feMesh=linearMesh,   nodeDofCount=dim )
@@ -57,7 +57,7 @@ velocityField.data[:] = [0.,0.]
 pressureField.data[:] = 0.
 
 
-# In[9]:
+# In[7]:
 
 #Boundary conditions
 
@@ -73,19 +73,19 @@ mixedslipBC = uw.conditions.DirichletCondition(     variable=velocityField,
                                                                   nodeIndexSets=(IWalls+BWalls, JWalls)  )
 
 
-# In[10]:
+# In[8]:
 
 #uw.conditions.DirichletCondition?
 
 
-# In[11]:
+# In[9]:
 
 #uw.shapes.BelowCosinePlane?
 
 
 # ##Geometry
 
-# In[12]:
+# In[10]:
 
 def below_cosine_func(x,y):
     if y < 7e3*math.cos(2*math.pi*(x/28e5)) + 7e5:
@@ -94,7 +94,7 @@ def below_cosine_func(x,y):
         return False
 
 
-# In[13]:
+# In[11]:
 
 #cosineShape = uw.shapes.BelowCosinePlane(dim, amplitude=7e3, wavelength=28e5, offset=7e5)
 maxCoord=(28e5,9e5)
@@ -103,7 +103,7 @@ below_cosine_func(maxCoord[0]/2., maxCoord[1]/2.)
 
 # ##Particles
 
-# In[14]:
+# In[12]:
 
 # We create swarms of particles which can advect, and which may determine 'materials'
 gSwarm = uw.swarm.Swarm( feMesh=elementMesh )
@@ -128,7 +128,7 @@ airIndex = 3
 materialVariable.data[:] = airIndex
 
 
-# In[15]:
+# In[13]:
 
 for particleID in range(gSwarm.particleCoordinates.data.shape[0]):
     x = gSwarm.particleCoordinates.data[particleID][0]
@@ -147,7 +147,7 @@ for particleID in range(gSwarm.particleCoordinates.data.shape[0]):
 #         else:
 #             materialVariable.data[particleID] =  mantleIndex
 
-# In[16]:
+# In[14]:
 
 #fig1 = plt.Figure()
 #fig1.Points( swarm=gSwarm, colourVariable=materialVariable )
@@ -155,7 +155,7 @@ for particleID in range(gSwarm.particleCoordinates.data.shape[0]):
 #fig1.show()
 
 
-# In[17]:
+# In[15]:
 
 incr = 5000.
 xps = np.linspace(0 + 1000.,28e5 - 1000., 10000)
@@ -165,7 +165,7 @@ surfswarm = uw.swarm.Swarm( feMesh=elementMesh )
 surfswarm.add_particles_with_coordinates(np.array((xps,yps)).T)
 
 
-# In[18]:
+# In[16]:
 
 #fig2 = plt.Figure()
 #fig2.Points( swarm=surfswarm, pointSize=2.0)
@@ -177,12 +177,12 @@ surfswarm.add_particles_with_coordinates(np.array((xps,yps)).T)
 
 # ##Material properties
 
-# In[19]:
+# In[17]:
 
 print(1e23, 10.**23)
 
 
-# In[20]:
+# In[18]:
 
 #
 viscosityMapFn  = fn.branching.map( keyFunc = materialVariable, 
@@ -205,7 +205,7 @@ else:
 buoyancyFn = gravity*densityMapFn
 
 
-# In[21]:
+# In[19]:
 
 # Setup the Stokes system again, now with full viscosity
 # For PIC style integration, we include a swarm for the a PIC integration swarm is generated within.
@@ -217,24 +217,24 @@ stokesPIC = uw.systems.Stokes(velocityField=velocityField,
                               bodyForceFn=buoyancyFn)
 
 
-# In[22]:
+# In[20]:
 
 solver = uw.systems.Solver(stokesPIC)
 
 
-# In[23]:
+# In[21]:
 
 solver.solve()
 
 
-# In[24]:
+# In[22]:
 
 #fig3 = plt.Figure()
 #fig3.Surface(pressureField, linearMesh)
 #fig3.show()
 
 
-# In[25]:
+# In[23]:
 
 # Create advector objects to advect the swarms. We specify second order integration.
 advector1 = uw.systems.SwarmAdvector( swarm=gSwarm, velocityField=velocityField, order=2)
@@ -246,7 +246,7 @@ advector2 = uw.systems.SwarmAdvector( swarm=surfswarm, velocityField=velocityFie
 
 
 
-# In[26]:
+# In[24]:
 
 def rms():
     squared = uw.utils.Integral(fn.math.dot(velocityField,velocityField), linearMesh)
@@ -263,7 +263,7 @@ def maxtop():
     
 
 
-# In[27]:
+# In[25]:
 
 # Stepping. Initialise time and timestep.
 realtime = 0.
@@ -273,19 +273,23 @@ timevals = []
 vrmsvals = []
 
 
-# In[ ]:
+# In[26]:
 
 sectoka = (3600*24*365*1000)
 
 
-# In[ ]:
+# In[27]:
+
+heightfn = fn.view.min_max(surfswarm.particleCoordinates[1])
+
+
+# In[28]:
 
 # create integral to get diff 
 f_o = open(outputPath+outputFile, 'w')
-fname = "topo.hdf5"
-fullpath = os.path.join( tempPath+ fname)
 start = time.clock()
-while step<10:
+while realtime/sectoka<100:
+#while step < 1:
     #stokesPIC2.solve(nonLinearIterate=True)
     solver.solve()
     dt1 = advector1.get_max_dt()
@@ -300,43 +304,19 @@ while step<10:
     step += 1
     timevals.append(realtime)
     #Save the suface swarm temporarily
+    heightfn.evaluate(surfswarm)
+    height = heightfn.max_global()
     if uw.rank() == 0:
-        surfswarm.save(fullpath)
-        tempfile = h5py.File(fullpath, libver='latest')
-        print tempfile.keys()
-        maxt = tempfile["Position"][:][:,1].max()
-        f_o.write((2*'%-15s ' + '\n') % (realtime,maxt))
-        tempfile.close()
-        os.remove(fullpath)
+        f_o.write((2*'%-15s ' + '\n') % (realtime,height))
     print 'step =',step, 'time', realtime/sectoka
 
 
-# In[ ]:
-
-#tempfile = h5py.File(fullpath, libver='latest')
-
-
-# import matplotlib.pylab as pyplt
-# 
-# kms = [j/1000. - 700 for j in maxheight]
-# 
-# kyas = [i/sectoka for i in timevals]
-# 
-# #Analytic solution
-# y = -0.2139e-11
-# def analytic_height(y,t):
-#     return 7e3*math.exp(y*t)
-# 
-# ah = [analytic_height(y,i)/1000. for i in timevals]
-# 
-# uw_paper = np.loadtxt("./CASE1_data/UNDERWORLD_sa_100_18.dat")
-# 
-# %pylab inline
-# pyplt.plot(kyas, kms)
-# pyplt.plot(kyas, ah)
-# pyplt.plot(uw_paper[:,0], uw_paper[:,1])
+# * Trying to get a min max evaluation to work on the swarm (parallel capable)
 
 # In[34]:
 
-
+heightfn = fn.view.min_max(surfswarm.particleCoordinates[1])
+heightfn.reset()
+heightfn.evaluate(surfswarm)
+heightfn.max_global()
 

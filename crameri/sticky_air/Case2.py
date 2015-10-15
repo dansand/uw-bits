@@ -29,7 +29,7 @@ outputFile = 'results_case' + str(CASE) + '.dat'
 if not os.path.isdir(outputPath):
     os.makedirs(outputPath)
 if not os.path.isdir(tempPath):
-    os.makedirs(tempPath) 
+    os.makedirs(tempPath)
 
 
 # In[4]:
@@ -45,8 +45,8 @@ dim = 2
 # In[6]:
 
 elementMesh = uw.mesh.FeMesh_Cartesian( elementType=("Q1/dQ0"),
-                                         elementRes=(384,192), 
-                                           minCoord=(0.,0.), 
+                                         elementRes=(384,192),
+                                           minCoord=(0.,0.),
                                            maxCoord=(28e5,9e5)  )
 linearMesh   = elementMesh
 constantMesh = elementMesh.subMesh
@@ -74,7 +74,7 @@ BWalls = linearMesh.specialSets["MinJ_VertexSet"]
 
 
 #free sides, no slip top
-mixedslipBC = uw.conditions.DirichletCondition(     variable=velocityField, 
+mixedslipBC = uw.conditions.DirichletCondition(     variable=velocityField,
                                                                   nodeIndexSets=(IWalls+BWalls, JWalls)  )
 
 
@@ -117,7 +117,7 @@ layout = uw.swarm.layouts.GlobalSpaceFillerLayout( swarm=gSwarm, particlesPerCel
 # Now use it to populate.
 gSwarm.populate_using_layout(layout=layout )
 
-# Lets initialise the 'materialVariable' data to represent two different materials. 
+# Lets initialise the 'materialVariable' data to represent two different materials.
 
 mantleIndex = 1
 lithosphereIndex = 2
@@ -133,7 +133,7 @@ materialVariable.data[:] = mantleIndex
 
 for particleID in range(gSwarm.particleCoordinates.data.shape[0]):
     x = gSwarm.particleCoordinates.data[particleID][0]
-    y = gSwarm.particleCoordinates.data[particleID][1]  
+    y = gSwarm.particleCoordinates.data[particleID][1]
     if gSwarm.particleCoordinates.data[particleID][1] > 6e5 and gSwarm.particleCoordinates.data[particleID][1] < 7e5:
         materialVariable.data[particleID] =  lithosphereIndex
     elif gSwarm.particleCoordinates.data[particleID][1] > 7e5:
@@ -183,7 +183,7 @@ print(1e23, 10.**23)
 # In[16]:
 
 #
-viscosityMapFn  = fn.branching.map( keyFunc = materialVariable, 
+viscosityMapFn  = fn.branching.map( keyFunc = materialVariable,
                          mappingDict = {mantleIndex:1e21,airIndex:1e18,lithosphereIndex:1e23, sphereIndex:1e20} )
 
 
@@ -195,9 +195,9 @@ if dim ==2:
     gravity = ( 0.0, -10.0 )
 else:
     gravity = ( 0.0, -10.0, 0.0)
-    
 
-# now create a buoyancy force vector.. the gravity tuple is converted to a function 
+
+# now create a buoyancy force vector.. the gravity tuple is converted to a function
 # here via operator overloading
 
 buoyancyFn = gravity*densityMapFn
@@ -208,10 +208,10 @@ buoyancyFn = gravity*densityMapFn
 # Setup the Stokes system again, now with full viscosity
 # For PIC style integration, we include a swarm for the a PIC integration swarm is generated within.
 # For gauss integration, simple do not include the swarm. Nearest neighbour is used where required.
-stokesPIC = uw.systems.Stokes(velocityField=velocityField, 
+stokesPIC = uw.systems.Stokes(velocityField=velocityField,
                               pressureField=pressureField,
                               conditions=[mixedslipBC,],
-                              viscosityFn=fn.exception.SafeMaths(viscosityMapFn), 
+                              viscosityFn=fn.exception.SafeMaths(viscosityMapFn),
                               bodyForceFn=buoyancyFn)
 
 
@@ -247,24 +247,31 @@ vrmsvals = []
 
 
 
-# In[1]:
+# In[ ]:
 
 sectoka = (3600*24*365*1000.)
+sectoka
 sectoma = (3600*24*365*1e6)
 
 
-# In[23]:
+# In[ ]:
 
-# create integral to get diff 
+heightfn = fn.view.min_max(surfswarm.particleCoordinates[1])
+
+
+# In[ ]:
+
+# create integral to get diff
 f_o = open(outputPath+outputFile, 'w')
 fname = "topo.hdf5"
 fullpath = os.path.join( tempPath+ fname)
 start = time.clock()
-while realtime /sectoma < 22.:
+#while step<10:
+while realtime/sectoma < 25:
     #stokesPIC2.solve(nonLinearIterate=True)
     solver.solve()
-    dt1 = advector1.get_max_dt()
-    dt = min((2.*sectoka),dt1)
+    dt = advector1.get_max_dt()
+    #dt = min((2.*sectoka),dt1)
     if step == 0:
         dt = 0.
     # Advect swarm using this timestep size
@@ -274,19 +281,12 @@ while realtime /sectoma < 22.:
     realtime += dt
     step += 1
     timevals.append(realtime)
-    #Save the suface swarm temporarily
+    #Save the suface swarm max to file
+    heightfn.evaluate(surfswarm)
+    height = heightfn.max_global()
     if uw.rank() == 0:
-        surfswarm.save(fullpath)
-        tempfile = h5py.File(fullpath, libver='latest')
-        print tempfile.keys()
-        maxt = tempfile["Position"][:][:,1].max()
-        f_o.write((2*'%-15s ' + '\n') % (realtime,maxt))
-        tempfile.close()
-        os.remove(fullpath)
-    print 'step =',step
+        f_o.write((2*'%-15s ' + '\n') % (realtime,height))
+    print 'step =',step, 'time', realtime/sectoma
 
 
 # In[ ]:
-
-
-
