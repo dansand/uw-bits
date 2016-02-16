@@ -1,26 +1,26 @@
 
 # coding: utf-8
 
-#
+# 
 # Viscoplastic thermal convection in a 2-D square box
 # =======
-#
+# 
 # Benchmarks from Tosi et al. 2015
 # --------
-#
-#
+# 
+# 
 
 # This notebook generates models from the <a name="ref-1"/>[(Tosi et al., 2015)](#cite-tosi2015community) in Underworld2. The Underworld2 results are compared to the model run on Fenics. Input files for the Fenics models were provided by Petra Maierova.
-#
+# 
 # This example uses the RT PIC solver with classic and nearest neighbour
-#
-#
+# 
+# 
 # References
 # ====
-#
+# 
 # <a name="cite-tosi2015community"/><sup>[^](#ref-1) </sup>Tosi, Nicola and Stein, Claudia and Noack, Lena and H&uuml;ttig, Christian and Maierov&aacute;, Petra and Samuel, Henri and Davies, DR and Wilson, CR and Kramer, SC and Thieulot, Cedric and others. 2015. _A community benchmark for viscoplastic thermal convection in a 2-D square box_.
-#
-#
+# 
+# 
 
 # Load python functions needed for underworld. Some additional python functions from os, math and numpy used later on.
 
@@ -29,19 +29,19 @@
 import underworld as uw
 import math
 from underworld import function as fn
-import glucifer.pylab as plt
+import glucifer
 import matplotlib.pyplot as pyplot
 import time
 import numpy as np
 import os
 
 
-# Set physical constants and parameters, including the Rayleigh number (*RA*).
+# Set physical constants and parameters, including the Rayleigh number (*RA*). 
 
 # In[2]:
 
 #Do you want to write hdf5 files - Temp, RMS, viscosity, stress?
-writeFiles = True
+writeFiles = False
 
 
 # In[3]:
@@ -90,7 +90,7 @@ ETA0 = 1e-3
 TMAX = 3.0
 IMAX = 1000
 YSTRESS = case_dict[CASE]['YSTRESS']
-RES = 96
+RES = 40
 
 
 # Alternatively, use a reference viscosity identical to Crameri and Tackley, i.e. normalised at 0.64.
@@ -153,12 +153,12 @@ if not os.path.isdir(filePath):
 
 # In[13]:
 
-elementMesh = uw.mesh.FeMesh_Cartesian( elementType=("Q1/dQ0"),
-                                         elementRes=(RES, RES),
-                                           minCoord=(0.,0.),
+elementMesh = uw.mesh.FeMesh_Cartesian( elementType=("Q1/dQ0"), 
+                                         elementRes=(RES, RES), 
+                                           minCoord=(0.,0.), 
                                            maxCoord=(1.,1.)  )
 linearMesh   = elementMesh
-constantMesh = elementMesh.subMesh
+constantMesh = elementMesh.subMesh 
 
 
 # Create Finite Element (FE) variables for the velocity, pressure and temperature fields. The last two of these are scalar fields needing only one value at each mesh point, while the velocity field contains a vector of *dim* dimensions at each mesh point.
@@ -168,6 +168,7 @@ constantMesh = elementMesh.subMesh
 velocityField    = uw.fevariable.FeVariable( feMesh=linearMesh,   nodeDofCount=dim )
 pressureField    = uw.fevariable.FeVariable( feMesh=constantMesh, nodeDofCount=1 )
 temperatureField = uw.fevariable.FeVariable( feMesh=linearMesh,   nodeDofCount=1 )
+temperatureDotField = uw.fevariable.FeVariable( feMesh=linearMesh,      nodeDofCount=1 )
 
 
 # Create some dummy fevariables for doing top and bottom boundary calculations.
@@ -180,7 +181,7 @@ bottomField    = uw.fevariable.FeVariable( feMesh=linearMesh,   nodeDofCount=1)
 topField.data[:] = 0.
 bottomField.data[:] = 0.
 
-# lets ensure temp boundaries are still what we want
+# lets ensure temp boundaries are still what we want 
 # on the boundaries
 for index in linearMesh.specialSets["MinJ_VertexSet"]:
     bottomField.data[index] = 1.
@@ -196,6 +197,8 @@ for index in linearMesh.specialSets["MaxJ_VertexSet"]:
 velocityField.data[:] = [0.,0.]
 pressureField.data[:] = 0.
 temperatureField.data[:] = 0.
+temperatureDotField.data[:] = 0.
+
 
 # Setup temperature initial condition via numpy arrays
 A = 0.01
@@ -204,20 +207,20 @@ tempNump = temperatureField.data
 for index, coord in enumerate(linearMesh.data):
     pertCoeff = (1- coord[1]) + A*math.cos( math.pi * coord[0] ) * math.sin( math.pi * coord[1] )
     tempNump[index] = pertCoeff;
-
+    
 
 
 # In[17]:
 
-# Get the actual sets
+# Get the actual sets 
 #
 #  HJJJJJJH
 #  I      I
 #  I      I
 #  I      I
 #  HJJJJJJH
-#
-#  Note that H = I & J
+#  
+#  Note that H = I & J 
 
 # Note that we use operator overloading to combine sets
 IWalls = linearMesh.specialSets["MinI_VertexSet"] + linearMesh.specialSets["MaxI_VertexSet"]
@@ -229,20 +232,20 @@ BWalls = linearMesh.specialSets["MinJ_VertexSet"]
 # In[18]:
 
 # Now setup the dirichlet boundary condition
-# Note that through this object, we are flagging to the system
-# that these nodes are to be considered as boundary conditions.
+# Note that through this object, we are flagging to the system 
+# that these nodes are to be considered as boundary conditions. 
 # Also note that we provide a tuple of sets.. One for the Vx, one for Vy.
-freeslipBC = uw.conditions.DirichletCondition(     variable=velocityField,
+freeslipBC = uw.conditions.DirichletCondition(     variable=velocityField, 
                                               nodeIndexSets=(IWalls,JWalls) )
 
 # also set dirichlet for temp field
-tempBC = uw.conditions.DirichletCondition(     variable=temperatureField,
+tempBC = uw.conditions.DirichletCondition(     variable=temperatureField, 
                                               nodeIndexSets=(JWalls,) )
 
 
 # In[19]:
 
-# Set temp boundaries
+# Set temp boundaries 
 # on the boundaries
 for index in linearMesh.specialSets["MinJ_VertexSet"]:
     temperatureField.data[index] = TB
@@ -251,14 +254,14 @@ for index in linearMesh.specialSets["MaxJ_VertexSet"]:
 
 
 # #Material properties
-#
+# 
 
 # In[20]:
 
 #Make variables required for plasticity
 
-secinvCopy = fn.tensor.second_invariant(
-                    fn.tensor.symmetric(
+secinvCopy = fn.tensor.second_invariant( 
+                    fn.tensor.symmetric( 
                         velocityField.gradientFn ))
 
 
@@ -272,11 +275,10 @@ coordinate = fn.input()
 #Remember to use floats everywhere when setting up functions
 
 #Linear viscosities
-#viscosityl1 = fn.math.exp(math.log(ETA_T)*-1*temperatureField)
 #viscosityl1 = fn.math.exp((math.log(ETA_T)*-1*temperatureField) + (math.log(ETA_T)*-1*0.64))
-viscosityl1 = fn.math.exp(math.log(ETA_T)*-1*temperatureField)
+viscosityl1 = fn.math.exp(math.log(ETA_T)*-1.*temperatureField)
 
-viscosityl2 = fn.math.exp((math.log(ETA_T)*-1*temperatureField) + (1.-coordinate[1])*math.log(ETA_Y))
+viscosityl2 = fn.math.exp((math.log(ETA_T)*-1.*temperatureField) + (1.-coordinate[1])*math.log(ETA_Y))
 
 viscosityFn1 = viscosityl1 #This one always gets passed to the first velcotity solve
 
@@ -294,97 +296,104 @@ else:
     viscosityFn2 = 2./(1./viscosityl2 + 1./viscosityp)
 
 
+# In[23]:
+
+print(RA, ETA_T, ETA_Y, ETA0, YSTRESS)
+
+
 # Set up simulation parameters and functions
 # ====
-#
-# Here the functions for density, viscosity etc. are set. These functions and/or values are preserved for the entire simulation time.
+# 
+# Here the functions for density, viscosity etc. are set. These functions and/or values are preserved for the entire simulation time. 
 
-# In[23]:
+# In[24]:
 
 densityFn = RA*temperatureField
 
 # define our vertical unit vector using a python tuple (this will be automatically converted to a function)
 z_hat = ( 0.0, 1.0 )
 
-# now create a buoyancy force vector using the density (FEvariable) and the vertical unit vector.
+# now create a buoyancy force vector using the density (FEvariable) and the vertical unit vector. 
 # The result from which will also be a FEvariable.
-buoyancyFn = z_hat * densityFn
+buoyancyFn = z_hat * densityFn 
 
 
 # Build the Stokes system, solvers, advection-diffusion
 # ------
-#
+# 
 # Setup linear Stokes system to get the initial velocity.
 
-# In[24]:
+# In[25]:
 
 #We first set up a l
-stokesPIC = uw.systems.Stokes(velocityField=velocityField,
+stokesPIC = uw.systems.Stokes(velocityField=velocityField, 
                               pressureField=pressureField,
                               conditions=[freeslipBC,],
-#                              viscosityFn=viscosityFn1,
-                              viscosityFn=fn.exception.SafeMaths(viscosityFn1),
+#                              viscosityFn=viscosityFn1, 
+                              viscosityFn=fn.exception.SafeMaths(viscosityFn1), 
                               bodyForceFn=buoyancyFn)
 
 
 # We do one solve with linear viscosity to get the initial strain rate invariant. This solve step also calculates a 'guess' of the the velocity field based on the linear system, which is used later in the non-linear solver.
 
-# In[25]:
+# In[26]:
 
 stokesPIC.solve()
 
 
-# In[26]:
+# In[27]:
 
 # Setup the Stokes system again, now with linear or nonlinear visocity viscosity.
-stokesPIC2 = uw.systems.Stokes(velocityField=velocityField,
+stokesPIC2 = uw.systems.Stokes(velocityField=velocityField, 
                               pressureField=pressureField,
                               conditions=[freeslipBC,],
-                              viscosityFn=fn.exception.SafeMaths(viscosityFn2),
+                              viscosityFn=fn.exception.SafeMaths(viscosityFn2), 
                               bodyForceFn=buoyancyFn )
 
 
-# In[27]:
+# In[28]:
 
 solver = uw.systems.Solver(stokesPIC2) # altered from PIC2
 
 
 # Solve for initial pressure and velocity using a quick non-linear Picard iteration
-#
+# 
 
-# In[28]:
+# In[29]:
 
 solver.solve(nonLinearIterate=True)
 
 
 # Create an advective-diffusive system
 # =====
-#
+# 
 # Setup the system in underworld by flagging the temperature and velocity field variables.
 
-# In[29]:
+# In[30]:
 
 # Create advdiff system
-advDiff = uw.systems.AdvectionDiffusion( temperatureField, velocityField, diffusivity=1., conditions=[tempBC,] )
+#advDiff = uw.systems.AdvectionDiffusion( temperatureField, velocityField, diffusivity=1., conditions=[tempBC,] )
+advDiff = uw.systems.AdvectionDiffusion( temperatureField, temperatureDotField, velocityField, diffusivity=1., conditions=[tempBC,] )
+
 
 
 # Metrics for benchmark
 # =====
-#
+# 
 # Define functions to be used in the time loop. For cases 1-4, participants were asked to report a number of diagnostic quantities to be measured after reaching steady state:
-#
+# 
 # * Average temp... $$  \langle T \rangle  = \int^1_0 \int^1_0 T \, dxdy $$
 # * Top and bottom Nusselt numbers... $$N = \int^1_0 \frac{\partial T}{\partial y} \rvert_{y=0/1} \, dx$$
 # * RMS velocity over the whole domain, surface and max velocity at surface
 # * max and min viscosity over the whole domain
 # * average rate of work done against gravity...$$\langle W \rangle = \int^1_0 \int^1_0 T u_y \, dx dy$$
 # * and the average rate of viscous dissipation...$$\langle \Phi \rangle = \int^1_0 \int^1_0 \tau_{ij} \dot \epsilon_{ij} \, dx dy$$
-#
-# * In steady state, if thermal energy is accurately conserved, the difference between $\langle W \rangle$ and $\langle \Phi \rangle / Ra$ must vanish, so also reported is the percentage error:
-#
+# 
+# * In steady state, if thermal energy is accurately conserved, the difference between $\langle W \rangle$ and $\langle \Phi \rangle / Ra$ must vanish, so also reported is the percentage error: 
+# 
 # $$ \delta = \frac{\lvert \langle W \rangle - \frac{\langle \Phi \rangle}{Ra} \rvert}{max \left(  \langle W \rangle,  \frac{\langle \Phi \rangle}{Ra}\right)} \times 100% $$
 
-# In[30]:
+# In[31]:
 
 #Setup some Integrals. We want these outside the main loop...
 tempint = uw.utils.Integral(temperatureField, linearMesh)
@@ -403,7 +412,7 @@ sinner = fn.math.dot(secinv,secinv)
 vdint = uw.utils.Integral((4.*viscosityFn2*sinner), linearMesh)
 
 
-# In[31]:
+# In[32]:
 
 def avg_temp():
     return tempint.evaluate()[0]/areaint.evaluate()[0]
@@ -424,10 +433,10 @@ def rms():
 def rmsBoundary(velocityField, velocityMesh, indexSet):
     v2fn = fn.math.dot(velocityField,velocityField)
     v2int = uw.utils.Integral(v2fn, mesh=velocityMesh, integrationType='Surface', surfaceIndexSet=indexSet)
-    rmsbound = math.sqrt(v2int.evaluate()[0])
+    rmsbound = math.sqrt(v2int.evaluate()[0]) 
     return rmsbound
-
-
+    
+    
     fn.math.dot(velocityField,np.array([1.,0.]))
     return math.sqrt(v2int.evaluate()[0]/topareaint.evaluate()[0])
 
@@ -453,14 +462,14 @@ def visc_extr(viscfn):
 
 
 
-# In[32]:
+# In[33]:
 
 #Fields for saving data / fields
 
 rmsField = uw.fevariable.FeVariable( feMesh=linearMesh,   nodeDofCount=1)
 rmsfn = fn.math.sqrt(fn.math.dot(velocityField,velocityField))
 rmsdata = rmsfn.evaluate(linearMesh)
-rmsField.data[:] = rmsdata
+rmsField.data[:] = rmsdata 
 
 viscField = uw.fevariable.FeVariable( feMesh=linearMesh,   nodeDofCount=1)
 viscdata = viscosityFn2.evaluate(linearMesh)
@@ -468,8 +477,8 @@ viscField.data[:] = viscdata
 
 
 stressField = uw.fevariable.FeVariable( feMesh=linearMesh,   nodeDofCount=1)
-srtdata = fn.tensor.second_invariant(
-                    fn.tensor.symmetric(
+srtdata = fn.tensor.second_invariant( 
+                    fn.tensor.symmetric( 
                         velocityField.gradientFn ))
 rostfield = srtdata.evaluate(linearMesh)
 stressinv = 2*viscdata*rostfield[:]
@@ -478,35 +487,35 @@ stressField.data[:] = stressinv
 
 # Main simulation loop
 # =======
-#
+# 
 # The main time stepping loop begins here. Before this the time and timestep are initialised to zero and the output statistics arrays are set up. Also the frequency of outputting basic statistics to the screen is set in steps_output.
-#
+# 
 
-# In[37]:
+# In[34]:
 
 realtime = 0.
 step = 0
 timevals = [0.]
-steps_end = 100
+steps_end = 5
 steps_output = 100
 steps_display_info = 20
 
 
-# In[38]:
+# In[35]:
 
 # initialise timer for computation
 start = time.clock()
 # setup summary output file (name above)
 f_o = open(outputPath+outputFile, 'w')
 # Perform steps
-while realtime < 0.15:
-#while step < steps_end:
+#while realtime < 0.15:
+while step < steps_end:
     #Enter non-linear loop
     solver.solve(nonLinearIterate=True)
     dt = advDiff.get_max_dt()
     if step == 0:
         dt = 0.
-    # Advect using this timestep size
+    # Advect using this timestep size   
     advDiff.integrate(dt)
     # Increment
     realtime += dt
@@ -524,7 +533,7 @@ while realtime < 0.15:
     # output to summary text file
     if uw.rank()==0:
         f_o.write((11*'%-15s ' + '\n') % (realtime, Viscdis, nu0, nu1, Avg_temp, Rms,Rms_surf,Max_vx_surf,Gravwork, etamax, etamin))
-
+   
     if step %  steps_display_info == 0:
         print('steps = {0:6d}; time = {1:.3e}; v_rms = {2:.3f}; Nu0 = {3:.3f}; Nu1 = {3:.3f}'
           .format(step, realtime, Rms, nu0, nu1))
@@ -550,7 +559,7 @@ while realtime < 0.15:
 f_o.close()
 
 
-# In[ ]:
+# In[36]:
 
 #fig1 = plt.Figure()
 #fig1.Surface(buoyancyFn[1], elementMesh)
@@ -560,15 +569,21 @@ f_o.close()
 #fig1.show()
 
 
+# In[40]:
+
+figTemp = glucifer.Figure()
+figTemp + glucifer.objects.Surface(elementMesh, temperatureField)
+figTemp + glucifer.objects.VectorArrows(elementMesh,velocityField, arrowHead=0.2, scaling=0.1)
+figTemp+ glucifer.objects.Mesh(linearMesh)
+figTemp.show()
+
+
+# In[41]:
+
+print(time.clock()-start, realtime)
+
+
 # In[ ]:
 
-#fig1 = plt.Figure()
-#fig1.Surface(buoyancyFn[1], elementMesh)
-#fig1.Surface(system, elementMesh)
-#fig1.Points( swarm=gSwarm, colourVariable=viscVariable , pointSize=3.0)
-#fig1.VectorArrows(velocityField, linearMesh, lengthScale=0.02)
-#fig1.show()
 
 
-# In[ ]:
-print(time.clock()-start, realtime, dt)
