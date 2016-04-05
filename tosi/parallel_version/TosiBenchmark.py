@@ -24,7 +24,7 @@
 
 # Load python functions needed for underworld. Some additional python functions from os, math and numpy used later on.
 
-# In[1]:
+# In[93]:
 
 import underworld as uw
 import math
@@ -34,24 +34,30 @@ import glucifer
 import time
 import numpy as np
 import os
+import shutil
+import natsort
+
+from mpi4py import MPI
+comm = MPI.COMM_WORLD
+rank = comm.Get_rank()
 
 
 # Set physical constants and parameters, including the Rayleigh number (*RA*). 
 
-# In[2]:
+# In[94]:
 
 #Do you want to write hdf5 files - Temp, RMS, viscosity, stress?
 writeFiles = False
 
 
-# In[3]:
+# In[95]:
 
 #ETA_T = 1e5
 #newvisc = math.exp(math.log(ETA_T)*0.64)
 #newvisc
 
 
-# In[4]:
+# In[96]:
 
 case_dict = {}
 case_dict[1] = {}
@@ -74,12 +80,16 @@ case_dict[5]['ETA_Y'] = 10.
 case_dict[5]['YSTRESS'] = 4.
 
 
-# In[5]:
+# In[97]:
 
 CASE = 4 # select identifier of the testing case (1-5)
 
 
-# In[6]:
+# In[98]:
+
+###########
+#Physical parameters
+###########
 
 RA  = 1e2        # Rayleigh number
 TS  = 0          # surface temperature
@@ -90,68 +100,105 @@ ETA0 = 1e-3
 TMAX = 3.0
 IMAX = 1000
 YSTRESS = case_dict[CASE]['YSTRESS']
-RES = 64
 
 
 # Alternatively, use a reference viscosity identical to Crameri and Tackley, i.e. normalised at 0.64.
 # In this case the Rayligh number would go to:
 
-# In[7]:
-
-math.exp(math.log(10**5)*0.64)
-
-
-# In[8]:
-
-#RA2/RA == newvisc
-
-
-# In[9]:
-
-#RA2 = RA *math.exp(math.log(10**5)*0.64)
-#print('new Rayleigh number would be: ' + str(RA2))
-
-
-# In[10]:
-
-#print(str(RA2), str(ETA0), str(YSTRESS))
-
-
 # Simulation parameters. Resolution in the horizontal (*Xres*) and vertical (*Yres*) directions.
 
-# In[11]:
+# In[ ]:
 
 
+
+
+# In[99]:
+
+###########
+#Mesh / simulation parameters
+###########
 dim = 2          # number of spatial dimensions
+RES = 64
 
 
 # Select which case of viscosity from Tosi et al (2015) to use. Adjust the yield stress to be =1 for cases 1-4, or between 3.0 and 5.0 (in increments of 0.1) in case 5.
 
+# In[100]:
+
+###########
+#Model Runtime parameters
+###########
+
+
+files_output = 1e6
+gldbs_output = 1000
+images_output = 1e6
+checkpoint_every = 200
+metric_output = 20
+
+comm.Barrier() #Barrier here so not procs run the check in the next cell too early 
+
+assert metric_output <= checkpoint_every, 'Checkpointing should run less or as often as metric output'
+
+
 # Set output file and directory for results
 
-# In[12]:
+# In[101]:
 
-outputPath = 'TosiOutput/'
-imagePath = 'TosiOutput/images'
-filePath = 'TosiOutput/files'
-dbPath = 'TosiOutput/gldbs'
-outputFile = 'results_case' + str(CASE) + '.dat'
+###########
+#Standard output directory setup
+###########
 
 
-# make directories if they don't exist
-if not os.path.isdir(outputPath):
-    os.makedirs(outputPath)
-if not os.path.isdir(imagePath):
-    os.makedirs(imagePath)
-if not os.path.isdir(dbPath):
-    os.makedirs(dbPath)
-if not os.path.isdir(filePath):
-    os.makedirs(filePath)
+outputPath = "results" + "/" +  str(CASE) + "/" + str(RES) + "/" 
+imagePath = outputPath + 'images/'
+filePath = outputPath + 'files/'
+checkpointPath = outputPath + 'checkpoint/'
+dbPath = outputPath + 'gldbs/'
+outputFile = 'results_model' + str(CASE) + '_' + str(RES) +  '.dat'
+
+if uw.rank()==0:
+    # make directories if they don't exist
+    if not os.path.isdir(outputPath):
+        os.makedirs(outputPath)
+    if not os.path.isdir(checkpointPath):
+        os.makedirs(checkpointPath)
+    if not os.path.isdir(imagePath):
+        os.makedirs(imagePath)
+    if not os.path.isdir(dbPath):
+        os.makedirs(dbPath)
+    if not os.path.isdir(filePath):
+        os.makedirs(filePath)
+        
+comm.Barrier() #Barrier here so not procs run the check in the next cell too early 
+
+
+# In[102]:
+
+###########
+#Check if starting from checkpoint
+###########
+
+checkdirs = []
+for dirpath, dirnames, files in os.walk(checkpointPath):
+    if files:
+        print dirpath, 'has files'
+        checkpointLoad = True
+        checkdirs.append(dirpath)
+    if not files:
+        print dirpath, 'is empty'
+        checkpointLoad = False
+        
+
+
+# In[ ]:
+
+
 
 
 # Create mesh objects. These store the indices and spatial coordiates of the grid points on the mesh.
 
-# In[13]:
+# In[103]:
 
 mesh = uw.mesh.FeMesh_Cartesian( elementType = ("Q1/dQ0"),
                                  elementRes  = (RES, RES), 
@@ -161,7 +208,7 @@ mesh = uw.mesh.FeMesh_Cartesian( elementType = ("Q1/dQ0"),
 
 # Create Finite Element (FE) variables for the velocity, pressure and temperature fields. The last two of these are scalar fields needing only one value at each mesh point, while the velocity field contains a vector of *dim* dimensions at each mesh point.
 
-# In[14]:
+# In[104]:
 
 velocityField       = uw.mesh.MeshVariable( mesh=mesh,         nodeDofCount=dim )
 pressureField       = uw.mesh.MeshVariable( mesh=mesh.subMesh, nodeDofCount=1 )
@@ -171,7 +218,7 @@ temperatureDotField = uw.mesh.MeshVariable( mesh=mesh,         nodeDofCount=1 )
 
 # Create some dummy fevariables for doing top and bottom boundary calculations.
 
-# In[16]:
+# In[105]:
 
 topField    = uw.mesh.MeshVariable( mesh=mesh,   nodeDofCount=1)
 bottomField    = uw.mesh.MeshVariable( mesh=mesh,   nodeDofCount=1)
@@ -189,7 +236,7 @@ for index in mesh.specialSets["MaxJ_VertexSet"]:
 
 # #ICs and BCs
 
-# In[18]:
+# In[106]:
 
 # Initialise data.. Note that we are also setting boundary conditions here
 velocityField.data[:] = [0.,0.]
@@ -208,7 +255,7 @@ for index, coord in enumerate(mesh.data):
     
 
 
-# In[19]:
+# In[107]:
 
 # Get the actual sets 
 #
@@ -227,7 +274,7 @@ TWalls = mesh.specialSets["MaxJ_VertexSet"]
 BWalls = mesh.specialSets["MinJ_VertexSet"]
 
 
-# In[20]:
+# In[108]:
 
 # Now setup the dirichlet boundary condition
 # Note that through this object, we are flagging to the system 
@@ -241,7 +288,7 @@ tempBC = uw.conditions.DirichletCondition(     variable=temperatureField,
                                               indexSetsPerDof=(JWalls,) )
 
 
-# In[22]:
+# In[109]:
 
 # Set temp boundaries 
 # on the boundaries
@@ -251,10 +298,19 @@ for index in mesh.specialSets["MaxJ_VertexSet"]:
     temperatureField.data[index] = TS
 
 
+# In[110]:
+
+if checkpointLoad:
+    checkpointLoadDir = natsort.natsorted(checkdirs)[-1]
+    temperatureField.load(os.path.join(checkpointLoadDir, "temperatureField" + ".hdf5"))
+    pressureField.load(os.path.join(checkpointLoadDir, "pressureField" + ".hdf5"))
+    velocityField.load(os.path.join(checkpointLoadDir, "velocityField" + ".hdf5"))
+
+
 # #Material properties
 # 
 
-# In[23]:
+# In[111]:
 
 #Make variables required for plasticity
 
@@ -263,12 +319,12 @@ secinvCopy = fn.tensor.second_invariant(
                             velocityField.fn_gradient ))
 
 
-# In[24]:
+# In[112]:
 
 coordinate = fn.input()
 
 
-# In[25]:
+# In[113]:
 
 #Remember to use floats everywhere when setting up functions
 
@@ -294,7 +350,7 @@ else:
     viscosityFn2 = 2./(1./viscosityl2 + 1./viscosityp)
 
 
-# In[26]:
+# In[114]:
 
 print(RA, ETA_T, ETA_Y, ETA0, YSTRESS)
 
@@ -304,7 +360,7 @@ print(RA, ETA_T, ETA_Y, ETA0, YSTRESS)
 # 
 # Here the functions for density, viscosity etc. are set. These functions and/or values are preserved for the entire simulation time. 
 
-# In[27]:
+# In[115]:
 
 densityFn = RA*temperatureField
 
@@ -321,7 +377,7 @@ buoyancyFn = z_hat * densityFn
 # 
 # Setup linear Stokes system to get the initial velocity.
 
-# In[28]:
+# In[116]:
 
 #We first set up a l
 stokesPIC = uw.systems.Stokes(velocityField=velocityField, 
@@ -334,13 +390,13 @@ stokesPIC = uw.systems.Stokes(velocityField=velocityField,
 
 # We do one solve with linear viscosity to get the initial strain rate invariant. This solve step also calculates a 'guess' of the the velocity field based on the linear system, which is used later in the non-linear solver.
 
-# In[29]:
+# In[117]:
 
 solver = uw.systems.Solver(stokesPIC)
 solver.solve() 
 
 
-# In[30]:
+# In[118]:
 
 # Setup the Stokes system again, now with linear or nonlinear visocity viscosity.
 stokesPIC2 = uw.systems.Stokes(velocityField=velocityField, 
@@ -350,7 +406,7 @@ stokesPIC2 = uw.systems.Stokes(velocityField=velocityField,
                               fn_bodyforce=buoyancyFn )
 
 
-# In[31]:
+# In[119]:
 
 solver = uw.systems.Solver(stokesPIC2) # altered from PIC2
 
@@ -358,7 +414,7 @@ solver = uw.systems.Solver(stokesPIC2) # altered from PIC2
 # Solve for initial pressure and velocity using a quick non-linear Picard iteration
 # 
 
-# In[32]:
+# In[120]:
 
 solver.solve(nonLinearIterate=True)
 
@@ -368,7 +424,7 @@ solver.solve(nonLinearIterate=True)
 # 
 # Setup the system in underworld by flagging the temperature and velocity field variables.
 
-# In[33]:
+# In[121]:
 
 
 advDiff = uw.systems.AdvectionDiffusion( phiField       = temperatureField, 
@@ -394,7 +450,7 @@ advDiff = uw.systems.AdvectionDiffusion( phiField       = temperatureField,
 # 
 # $$ \delta = \frac{\lvert \langle W \rangle - \frac{\langle \Phi \rangle}{Ra} \rvert}{max \left(  \langle W \rangle,  \frac{\langle \Phi \rangle}{Ra}\right)} \times 100% $$
 
-# In[38]:
+# In[122]:
 
 #Setup some Integrals. We want these outside the main loop...
 tempint = uw.utils.Integral(temperatureField, mesh)
@@ -413,7 +469,7 @@ sinner = fn.math.dot(secinv,secinv)
 vdint = uw.utils.Integral((4.*viscosityFn2*sinner), mesh)
 
 
-# In[49]:
+# In[123]:
 
 def avg_temp():
     return tempint.evaluate()[0]/areaint.evaluate()[0]
@@ -458,12 +514,12 @@ def visc_extr(viscfn):
     return vuviscfn.max_global(), vuviscfn.min_global()
 
 
-# In[50]:
+# In[124]:
 
 avg_temp()
 
 
-# In[51]:
+# In[125]:
 
 #Fields for saving data / fields
 
@@ -487,13 +543,37 @@ stressinv = 2*viscdata*rostfield[:]
 stressField.data[:] = stressinv
 
 
+# In[126]:
+
+def checkpoint1(step, checkpointPath,filename, filewrites):
+    path = checkpointPath + str(step) 
+    os.mkdir(path)
+    ##Write and save the file, if not already a writing step
+    if not step % filewrites == 0:
+        filename.write((13*'%-15s ' + '\n') % (realtime, Viscdis, float(Nu0glob), float(Nu1glob), Avg_temp, 
+                                              Rms,Rmsurfglob,Max_vx_surf,Gravwork, etamax, etamin, Viscdisair, Viscdislith))
+    filename.close()
+    shutil.copyfile(os.path.join(outputPath, outputFile), os.path.join(path, outputFile))
+
+
+def checkpoint2(step, checkpointPath,  filename):
+    path = checkpointPath + str(step) 
+    velfile = "velocityField" + ".hdf5"
+    tempfile = "temperatureField" + ".hdf5"
+    pressfile = "pressureField" + ".hdf5"
+    velocityField.save(os.path.join(path, velfile))
+    temperatureField.save(os.path.join(path, tempfile))
+    pressureField.save(os.path.join(path, pressfile))
+        
+
+
 # Main simulation loop
 # =======
 # 
 # The main time stepping loop begins here. Before this the time and timestep are initialised to zero and the output statistics arrays are set up. Also the frequency of outputting basic statistics to the screen is set in steps_output.
 # 
 
-# In[52]:
+# In[127]:
 
 realtime = 0.
 step = 0
@@ -503,14 +583,40 @@ steps_output = 1e6
 steps_display_info = 20
 
 
-# In[53]:
+# In[128]:
+
+###########
+#Open file for writing metrics
+###########
+
+if checkpointLoad:
+    if uw.rank() == 0:
+        shutil.copyfile(os.path.join(checkpointLoadDir, outputFile), outputPath+outputFile)
+    comm.Barrier()
+    #os.rename(os.path.join(checkpointLoadDir, outputFile), outputPath+outputFile)
+    f_o = open(os.path.join(outputPath, outputFile), 'a')
+    prevdata = np.genfromtxt(os.path.join(outputPath, outputFile), skip_header=0, skip_footer=0)
+    realtime = prevdata[prevdata.shape[0]-1, 0]
+    step = int(checkpointLoadDir.split('/')[-1])
+    timevals = [0.]
+else:
+    f_o = open(outputPath+outputFile, 'w')
+    realtime = 0.
+    step = 0
+    timevals = [0.]
+
+
+# In[129]:
+
+step
+
+
+# In[130]:
 
 # initialise timer for computation
 start = time.clock()
-# setup summary output file (name above)
-f_o = open(outputPath+outputFile, 'w')
 # Perform steps
-while realtime < 0.25:
+while realtime < 0.15:
 #while step < steps_end:
     #Enter non-linear loop
     solver.solve(nonLinearIterate=True)
@@ -523,22 +629,22 @@ while realtime < 0.25:
     realtime += dt
     step += 1
     timevals.append(realtime)
+    ################            
     # Calculate the Metrics, only on 1 of the processors:
-    Avg_temp = avg_temp()
-    Rms = rms()
-    Rms_surf = rmsBoundary(velocityField,mesh, TWalls)
-    Max_vx_surf = max_vx_surf(velocityField, mesh)
-    Gravwork = gravwork(dwint)
-    Viscdis = viscdis(vdint)
-    nu0, nu1 = nusseltNumber(temperatureField, mesh, BWalls), nusseltNumber(temperatureField, mesh, TWalls)
-    etamax, etamin = visc_extr(viscosityFn2)
-    # output to summary text file
-    if uw.rank()==0:
-        f_o.write((11*'%-15s ' + '\n') % (realtime, Viscdis, nu0, nu1, Avg_temp, Rms,Rms_surf,Max_vx_surf,Gravwork, etamax, etamin))
-   
-    if step %  steps_display_info == 0:
-        print('steps = {0:6d}; time = {1:.3e}; v_rms = {2:.3f}; Nu0 = {3:.3f}; Nu1 = {3:.3f}'
-          .format(step, realtime, Rms, nu0, nu1))
+    ################
+    if (step % metric_output == 0):
+    
+        Avg_temp = avg_temp()
+        Rms = rms()
+        Rms_surf = rmsBoundary(velocityField,mesh, TWalls)
+        Max_vx_surf = max_vx_surf(velocityField, mesh)
+        Gravwork = gravwork(dwint)
+        Viscdis = viscdis(vdint)
+        nu0, nu1 = nusseltNumber(temperatureField, mesh, BWalls), nusseltNumber(temperatureField, mesh, TWalls)
+        etamax, etamin = visc_extr(viscosityFn2)
+        # output to summary text file
+        if uw.rank()==0:
+            f_o.write((11*'%-15s ' + '\n') % (realtime, Viscdis, nu0, nu1, Avg_temp, Rms,Rms_surf,Max_vx_surf,Gravwork, etamax, etamin))
     # output image to file
     if (step % steps_output == 0) & (writeFiles == True):
         ##Files to save
@@ -558,10 +664,22 @@ while realtime < 0.25:
         fnamestress = "stressField" + "_" + str(CASE) + "_" + str(step) + ".hdf5"
         fullpath = os.path.join(outputPath + "files/" + fnamestress)
         stressField.save(fullpath)
+    ################
+    #Checkpoint
+    ################
+    if step % checkpoint_every == 0:
+        if uw.rank() == 0:
+            checkpoint1(step, checkpointPath,f_o, metric_output)           
+        checkpoint2(step, checkpointPath, f_o)
+        f_o = open(os.path.join(outputPath, outputFile), 'a') #is this line supposed to be here?
+
+
+# In[ ]:
+
 f_o.close()
 
 
-# In[68]:
+# In[ ]:
 
 figTemp = glucifer.Figure()
 figTemp.append( glucifer.objects.Surface(mesh, temperatureField))
