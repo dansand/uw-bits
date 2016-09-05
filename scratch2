@@ -1,0 +1,218 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "Test whether swarm / swarm var. saving fails in parallel (probably because there are no particles on a processor?)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "\n",
+    "import underworld as uw\n",
+    "import glucifer\n",
+    "import numpy as np"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "mesh = uw.mesh.FeMesh_Cartesian( elementRes  = (64, 64), \n",
+    "                                 minCoord    = (0., 0.), \n",
+    "                                 maxCoord    = (1., 1.))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "swarm = uw.swarm.Swarm( mesh=mesh )\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 4,
+   "metadata": {
+    "collapsed": false
+   },
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "array([0, 1], dtype=int32)"
+      ]
+     },
+     "execution_count": 4,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "\n",
+    "# initialise a swarm\n",
+    "swarmCustom = uw.swarm.Swarm( mesh=mesh )\n",
+    "swarmCoords = np.array([ [0.2,0.2], [0.4,0.4]])\n",
+    "# use this array to add particles to the newly created swarm\n",
+    "# note that the array returned from the following method specifies the \n",
+    "# local identifier for the added particles.  particles which are not \n",
+    "# inside the local domain (they may live on other processors), will \n",
+    "# be signified with a -1\n",
+    "swarmCustom.add_particles_with_coordinates(swarmCoords)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "metadata": {
+    "collapsed": false
+   },
+   "outputs": [],
+   "source": [
+    "testVar = uw.swarm.SwarmVariable(swarmCustom, dataType='double', count=4)\n",
+    "testVar.data[:] = 1.33"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 6,
+   "metadata": {
+    "collapsed": false
+   },
+   "outputs": [],
+   "source": [
+    "#fig1 = glucifer.Figure()\n",
+    "#fig1.append( glucifer.objects.Points(swarm=swarmCustom, pointSize=5, colourBar=False) )\n",
+    "#fig1.append( glucifer.objects.Mesh(mesh) )\n",
+    "\n",
+    "#fig1.show()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 7,
+   "metadata": {
+    "collapsed": false
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "now we try to save\n"
+     ]
+    }
+   ],
+   "source": [
+    "print (\"now we try to save\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 8,
+   "metadata": {
+    "collapsed": false
+   },
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "<underworld.utils._utils.SavedFileData at 0x7efd5e6c0f50>"
+      ]
+     },
+     "execution_count": 8,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "swarmCustom.save('swarm_test_save')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 10,
+   "metadata": {
+    "collapsed": false
+   },
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "<underworld.utils._utils.SavedFileData at 0x7efd5e23e810>"
+      ]
+     },
+     "execution_count": 10,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "testVar.save('var_test_save')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": []
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 2",
+   "language": "python",
+   "name": "python2"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 2
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython2",
+   "version": "2.7.9"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 0
+}
